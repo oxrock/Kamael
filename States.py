@@ -344,8 +344,8 @@ class RighteousVolley(baseState):
         controller_state = SimpleControllerState()
         controller_state.throttle = 0
         controller_state.boost = False
-        #ball_local = toLocal(self.agent.ball.location, self.agent.me)
-        ball_local = toLocal(self.target, self.agent.me)
+        ball_local = toLocal(self.agent.ball.location, self.agent.me)
+        #ball_local = toLocal(self.target, self.agent.me)
         ball_angle = math.atan2(ball_local.data[1], ball_local.data[0])
         angle_degrees = correctAngle(math.degrees(ball_angle))
         if not self.jumped:
@@ -392,14 +392,8 @@ class DivineRetribution():
         self.targetCar = targetCar
         self.active = True
     def update(self,):
-        action = demoEnemyCar(self.agent,self.targetCar)
+        action = demoTarget(self.agent,self.targetCar)
         return action
-
-        # action = demoMagic(self.agent)
-        # if action != None:
-        #     return action
-        # else:
-        #     return saferBoostGrabber(self.agent)
 
 class DemolitionBot():
     def __init__(self,agent):
@@ -887,7 +881,7 @@ class Chase(baseState):
 class BlessingOfSafety(baseState):
     def update(self):
         if distance2D(Vector([0, 5200 * sign(self.agent.team), 200]),
-                      convertStructLocationToVector(self.agent.selectedBallPred)) < 2000:
+                      self.agent.currentHit.pred_vector) < 2000:
             return ShellTime(self.agent)
         else:
             return playBack(self.agent)
@@ -1170,6 +1164,203 @@ def facePositionManager(agent):
 def demoTest(agent):
     targ = findEnemyClosestToLocation(agent,agent.ball.location)[0]
     return demoEnemyCar(agent,targ)
+
+
+def newTeamStateManager(agent):
+    agentType = type(agent.activeState)
+    if agentType != PreemptiveStrike:
+
+        if not kickOffTest(agent):
+            myGoalLoc = Vector([0, 5200 * sign(agent.team), 200])
+
+            ballDistanceFromGoal = distance2D(myGoalLoc, agent.ball)
+            carDistanceFromGoal = distance2D(myGoalLoc, agent.me)
+
+            if agentType == LeapOfFaith:
+                if agent.activeState.active != False:
+                    return
+            if agentType == airLaunch:
+                if agent.activeState.active != False:
+                    return
+
+            if agentType == BlessingOfDexterity:
+                if agent.activeState.active != False:
+                    return
+
+            if agentType == DivineGrace:
+                if agent.activeState.active != False:
+                    return
+
+            if agentType == RighteousVolley:
+                if agent.activeState.active != False:
+                    return
+
+            hit = find_soonest_hit(agent)
+            openNet = openGoalOpportunity(agent)
+            agent.openGoal = openNet
+            agent.timid = False
+            scared = False
+            tempDelay = hit.prediction_time - agent.gameInfo.seconds_elapsed
+
+            if tempDelay >= agent.enemyBallInterceptDelay - .25:
+                if agent.enemyAttacking:
+                    agent.contested = True
+
+
+            if tempDelay >= agent.enemyBallInterceptDelay + 1:
+                if not butterZone(hit.pred_vector):
+                    if ballDistanceFromGoal <= 5000:
+                        agent.timid = True
+                    else:
+                        scared = True
+                    #print(tempDelay,agent.enemyBallInterceptDelay)
+                    #pass
+
+            if distance2D(hit.pred_vector,myGoalLoc) <= 2000 or distance2D(agent.enemyTargetVec,myGoalLoc) <= 2000:
+                agent.contested = True
+                agent.timid = False
+                scared = False
+
+
+
+
+
+            if not agent.contested:
+                if agent.hits[0] != None:
+                    temptime = agent.hits[0].prediction_time - agent.gameInfo.seconds_elapsed
+                    #if temptime >=1:
+                    if hit.hit_type != 2:
+                        if temptime < agent.enemyBallInterceptDelay - .25:
+                            hit = agent.hits[0]
+
+            goalward = ballHeadedTowardsMyGoal_testing(agent, hit)
+            agent.goalward = goalward
+            agent.currentHit = hit
+            agent.ballDelay = hit.prediction_time - agent.time
+            agent.ballGrounded = False
+
+            #print(agent.ballDelay, agent.enemyBallInterceptDelay,agent.contested,agent.timid)
+
+            if hit.hit_type == 2:
+                agent.wallShot = True
+                agent.ballGrounded = False
+            else:
+                agent.wallShot = False
+                if hit.hit_type == 1:
+                    if hit.pred_vector[2] <=agent.groundCutOff:
+                        agent.ballGrounded = True
+                    else:
+                        agent.ballGrounded = False
+
+
+
+            createBox(agent, hit.pred_vector)
+
+            if agentType == Aerial:
+                if agent.activeState.active != False:
+                    return
+
+
+
+            if not agent.onSurface:
+                if agent.me.location[2] > 170:
+                    if agentType != DivineGrace:
+                        agent.activeState = DivineGrace(agent)
+                    return
+
+
+            if agent.dribbling:
+                if not goalward:
+                    if agentType != AngelicEmbrace:
+                        agent.activeState = AngelicEmbrace(agent)
+                    return
+
+            #determine which man in rotation I am #1, #2, #3, forward
+            man = 1
+            if agent.me.location[1] * sign(agent.team) < agent.ball.location[1] *sign(agent.team):
+                if agent.me.location[1] * sign(agent.team) < agent.currentHit.pred_vector[1] * sign(agent.team):
+                    man = 4
+            else:
+
+                myDist = distance2D(agent.me.location, agent.ball.location)
+                for ally in agent.allies:
+                    if ally.location[1] * sign(agent.team) > agent.ball.location[1] *sign(agent.team):
+                        if distance2D(ally.location, agent.ball.location) < myDist:
+                            man += 1
+                man = clamp(3, 0, man)
+
+            if man == 1:
+                if carDistanceFromGoal > ballDistanceFromGoal:
+                    if agentType != HolyProtector:
+                        agent.activeState = HolyProtector(agent)
+                    return
+
+                elif goalward:
+                    if hit.hit_type !=2:
+                        if agentType != HolyProtector:
+                            agent.activeState = HolyProtector(agent)
+                        return
+                    else:
+                        if agentType != ScaleTheWalls:
+                            agent.activeState = ScaleTheWalls(agent)
+                            #print("scaling walls")
+                        #print(f"scale the walls defensive {agent.time}")
+                        return
+
+
+                else:
+
+                    if hit.hit_type == 0:
+                        if agentType != GroundAssault:
+                            agent.activeState = GroundAssault(agent)
+                        return
+
+                    elif hit.hit_type == 1:
+                        if agentType != HolyGrenade:
+                            agent.activeState = HolyGrenade(agent)
+                        return
+
+                    elif hit.hit_type == 2:
+                        if agentType != ScaleTheWalls:
+                            agent.activeState = ScaleTheWalls(agent)
+                        return
+
+            elif man == 2:
+                if agentType != BlessingOfSafety:
+                    agent.activeState = BlessingOfSafety(agent)
+                return
+
+            elif man == 3:
+                if agentType != BlessingOfSafety:
+                    agent.activeState = BlessingOfSafety(agent)
+                return
+
+            elif man == 4:
+                #check if there's an ally defending
+                # viable = False
+                # for ally in agent.allies:
+                #     if distance2D(ally.location,agent.ball.location) < ballDistanceFromGoal:
+                #         viable = True
+                #         break
+                # if viable:
+                #     if agent.me.boostLevel > 0 or agent.currentSpd >= 2200:
+                #         if agentType != DivineRetribution:
+                #             agent.activeState = DivineRetribution(agent, agent.closestEnemyToBall)
+                #         return
+                #     else:
+                #         if agentType != BlessingOfSafety:
+                #             agent.activeState = BlessingOfSafety(agent)
+                #         return
+                # else:
+                #     if agentType != BlessingOfSafety:
+                #         agent.activeState = BlessingOfSafety(agent)
+                #     return
+                if agentType != BlessingOfSafety:
+                    agent.activeState = BlessingOfSafety(agent)
+                return
+
+        else:
+            agent.activeState = PreemptiveStrike(agent)
 
 
 

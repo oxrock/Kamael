@@ -557,6 +557,21 @@ def demoEnemyCar(agent,targetCar):
         renderCall(agent.renderer.draw_line_3d, agent.me.location.toList(), targPos.toList(), agent.renderer.purple))
     return testMover(agent,targPos,maxPossibleSpeed)
 
+def demoTarget(agent,targetCar):
+    currentSpd = clamp(maxPossibleSpeed, 100, agent.currentSpd)
+    distance = distance2D(agent.me.location, targetCar.location)
+
+    currentTimeToTarget = inaccurateArrivalEstimator(agent, targetCar.location)
+    lead = clamp(5, 0, currentTimeToTarget)
+
+    enemyspd = targetCar.velocity.magnitude()
+    multi = clamp(1500, 0, enemyspd * currentTimeToTarget)
+    targPos = targetCar.location + (targetCar.velocity.normalize().scale(multi))
+    agent.renderCalls.append(
+        renderCall(agent.renderer.draw_line_3d, agent.me.location.toList(), targPos.toList(), agent.renderer.purple))
+
+    return driveController(agent,targPos,currentTimeToTarget,expedite = True)
+    #return testMover(agent, targPos, maxPossibleSpeed)
 
 
 def demoMagic(agent):
@@ -764,14 +779,15 @@ def backmanBoostGrabber(agent, stayOnSide = True):
         if boost.spawned:
             if boost.location[1] *sign(agent.team) >= minY:
                 if stayOnSide:
-                    if agent.ball.location[0] >= 0:
-                        if boost.location[0] < 0:
-                            continue
-
-                    else:
-                        if agent.ball.location[0] < 0:
-                            if boost.location[0] >= 0:
+                    if len(agent.allies) < 1:
+                        if agent.ball.location[0] >= 0:
+                            if boost.location[0] < 0:
                                 continue
+
+                        else:
+                            if agent.ball.location[0] < 0:
+                                if boost.location[0] >= 0:
+                                    continue
 
                 distance = distance2D(agent.me.location, boost.location)
                 localCoords = toLocal(boost.location, agent.me)
@@ -1669,7 +1685,7 @@ def lineupShot(agent,multi):
 
     goalSpot,correctedAngle = goal_selector(agent, mode=1)
 
-    if len(agent.allies) < 1:
+    if len(agent.allies) < 1 or agent.me.boostLevel < 1:
         if abs(correctedAngle) >= 60:
             if agent.contested:
                 if not butterZone(targetVec):
@@ -2288,7 +2304,6 @@ def driveController(agent,target,arrivalTime, expedite = False, flippant = False
         agent.setJumping(6,target = target)
         #print("breaking rule #1")
 
-
     if agent.forward:
         throttle = 1
     else:
@@ -2302,11 +2317,10 @@ def driveController(agent,target,arrivalTime, expedite = False, flippant = False
             if _distance > 1000:
                 if abs(angle_degrees) <= 10:
                     agent.setHalfFlip()
-                    #print(f"old angle {oldAngle}  new angle {angle_degrees}")
 
     boost = False
 
-    steer, handbrake = rockSteer(angle, _distance)
+    steer, handbrake = rockSteer(angle, _distance, forward = agent.forward)
 
     # if _distance < 300 and _distance > 40:
     #     if agent.currentSpd < 600:
@@ -2344,7 +2358,7 @@ def driveController(agent,target,arrivalTime, expedite = False, flippant = False
                             boost = True
 
         if agent.currentSpd > 1050:
-            if _distance > clamp(maxPossibleSpeed,agent.currentSpd,agent.currentSpd+500)*2.1 or (agent.me.boostLevel <=1 and flippant):
+            if _distance > clamp(maxPossibleSpeed,agent.currentSpd,agent.currentSpd+500)*2.3 or (agent.me.boostLevel <=1 and flippant):
                 if abs(angle_degrees) <= clamp(5, 0, _distance / 1000):
                     if agent.onSurface:
                         if agent.forward:
@@ -2584,11 +2598,14 @@ def Gsteer(angle):
     return clamp(1,-1,final)
 
 
-def rockSteer(angle,distance):
+def rockSteer(angle,distance,forward = True):
     turn = Gsteer(angle)
     slide = False
     distanceMod = clamp(10,.3,distance/500)
-    _angle = correctAngle(math.degrees(angle))
+    if forward:
+        _angle = correctAngle(math.degrees(angle))
+    else:
+        _angle = correctAngle(math.degrees(angle)-180)
 
 
     adjustedAngle = _angle/distanceMod

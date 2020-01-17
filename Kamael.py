@@ -332,16 +332,10 @@ class Kamael(BaseAgent):
     def get_output(self, packet: GameTickPacket) -> SimpleControllerState:
         oldTimer = self.time
         self.preprocess(packet)
-        # if self.time == oldTimer:
-        #     if self.controller_state != None:
-        #         pass
-        #         #return self.controller_state
-
-        # if len(self.allies) >=1:
-        #     teamStateManager(self)
-        # else:
-        soloStateManager(self)
-        #soloStateManager_testing(self)
+        if len(self.allies) > 0:
+            newTeamStateManager(self)
+        else:
+            soloStateManager(self)
 
         #action = SimpleControllerState()
         action = self.activeState.update()
