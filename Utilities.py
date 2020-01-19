@@ -1647,7 +1647,7 @@ def groundTackler(agent):
         if agent.enemyBallInterceptDelay < .3:
             agent.setJumping(6,target = agent.enemyTargetVec)
             print(f"ground tacking! {agent.time}")
-    return driveController(agent,targetLoc,agent.enemyBallInterceptDelay,expedite = True)
+    return driveController(agent,targetLoc,agent.time+agent.enemyBallInterceptDelay,expedite = True)
 
 
 
@@ -1706,7 +1706,7 @@ def lineupShot(agent,multi):
 
     positioningOffset = 50
     shotOffset = carOffset+ballOffset
-    ballOffset -= clamp(10, 0, targetVec[2] - 92.5)
+    ballOffset -= clamp(25, 0, targetVec[2] - 92.5)
     totalOffset = carOffset + ballOffset
     #futurePos = agent.me.location + agent.me.velocity.scale(agent.ballDelay)
     futurePos = agent.me.location + agent.me.velocity.scale(agent.ballDelay)
@@ -1767,21 +1767,21 @@ def lineupShot(agent,multi):
     #         targetLoc = targetVec - _direction.scale(carOffset)
     #         modifiedDelay = agent.ballDelay
 
-    # if not targetLoc:
-    #     if agent.contested:
-    #         if not agent.openGoal:
-    #             _direction = direction(center, targetVec)
-    #             positioningOffset = totalOffset*.6
-    #             targetLoc = targetVec - _direction.scale(positioningOffset)
-    #             modifiedDelay = agent.ballDelay
-
     if not targetLoc:
-        if distance < 500:
-            _direction = direction(goalSpot, targetVec)
-            positioningOffset = totalOffset*.6
-            targetLoc = targetVec - _direction.scale(positioningOffset)
-            modifiedDelay = agent.ballDelay
-            #print(f"straight shooting {agent.time}")
+        if agent.contested:
+            if not agent.openGoal:
+                _direction = direction(center, targetVec)
+                positioningOffset = totalOffset*.6
+                targetLoc = targetVec - _direction.scale(positioningOffset)
+                modifiedDelay = agent.ballDelay
+
+    # if not targetLoc:
+    #     if distance < 500:
+    #         _direction = direction(goalSpot, targetVec)
+    #         positioningOffset = totalOffset*.5
+    #         targetLoc = targetVec - _direction.scale(positioningOffset)
+    #         modifiedDelay = agent.ballDelay
+    #         #print(f"straight shooting {agent.time}")
 
 
     if not targetLoc:
@@ -1813,7 +1813,7 @@ def lineupShot(agent,multi):
         print("in here")
 
 
-    result = driveController(agent,targetLoc,modifiedDelay,expedite=True)
+    result = driveController(agent,targetLoc,agent.time+modifiedDelay,expedite=True)
 
     targetLoc.data[2] = 95
     agent.renderCalls.append(renderCall(agent.renderer.draw_line_3d, agent.me.location.toList(), targetLoc.toList(),
@@ -2044,10 +2044,22 @@ def carry_flick(agent, cradled = False):
             offsetCap = 45
     flick = False
 
+    availableAccel = getNaturalAcceleration2(agent.currentSpd)
+    if agent.me.boostLevel > 5:
+        if agent.forward:
+            availableAccel+= 991.667
+
+    #print(availableAccel/60)
+    #offsetCap = clamp(70,8,availableAccel/60)
+    #print(offsetCap)
+
+
     targetVec = agent.currentHit.pred_vector
 
     # targetVec = agent.ball.location + agent.ball.velocity.scale(agent.deltaTime)
     # agent.ballDelay = agent.deltaTime
+    #targetVec = agent.ball.location + agent.ball.velocity.scale(agent.deltaTime)
+
 
     targetLocal = toLocal(targetVec, agent.me)
     carToBallAngle = correctAngle(math.degrees(math.atan2(targetLocal[1], targetLocal[0])))
@@ -2066,7 +2078,7 @@ def carry_flick(agent, cradled = False):
     if agent.enemyBallInterceptDelay <= .5 or agent.closestEnemyToBallDistance <= 600:
         flick = True
 
-    offset = clamp(offsetCap,minOffset,((abs(carToBallAngle)+abs(goalAngle))/2)*15)
+    offset = clamp(offsetCap,minOffset,((abs(carToBallAngle)+abs(goalAngle))/2)*16)
     if distance2D(agent.me.location,center) < 1000:
         if not flick:
             offset = 90
@@ -2081,6 +2093,7 @@ def carry_flick(agent, cradled = False):
     #return timeDelayedMovement(agent,targetLoc,agent.ballDelay,False)
     #print(f"in carry {agent.time}")
     return driveController(agent, targetLoc, agent.time+agent.ballDelay,expedite=True)
+    #return driveController(agent, targetLoc, agent.time + 1/30, expedite=True)
 
 def inTheMiddle(testNumber,guardNumbersList):
     return min(guardNumbersList) <= testNumber <= max(guardNumbersList)
@@ -2132,7 +2145,7 @@ def wallMover(agent,target,targetSpd,arrivalTime):
 
         if needsIntersection:
             #return efficientMover(agent,intersection,targetSpd,boostHunt=False)
-            return driveController(agent,intersection,arrivalTime/2, expedite = True)
+            return driveController(agent,intersection,agent.time+(arrivalTime-agent.time)/2, expedite = True)
 
     elif agent.onWall and not agent.wallShot:
         jumpingDown = True
@@ -2319,8 +2332,7 @@ def driveController(agent,target,arrivalTime, expedite = False, flippant = False
                     agent.setHalfFlip()
 
     boost = False
-
-    steer, handbrake = rockSteer(angle, _distance, forward = agent.forward)
+    steer, handbrake = rockSteer(angle, _distance,modifier=700)
 
     # if _distance < 300 and _distance > 40:
     #     if agent.currentSpd < 600:
@@ -2598,7 +2610,7 @@ def Gsteer(angle):
     return clamp(1,-1,final)
 
 
-def rockSteer(angle,distance,forward = True):
+def rockSteer(angle,distance,forward = True, modifier = 500):
     turn = Gsteer(angle)
     slide = False
     distanceMod = clamp(10,.3,distance/500)
@@ -3110,7 +3122,7 @@ def calcEnemyTimeWithAcceleration(agent,distance,enemyPhysicsObject):
     #print("enemy started")
     while distanceTally < distance and estimatedTime < 6:
         if estimatedSpd < maxPossibleSpeed:
-            acceleration =  getNaturalAcceleration(estimatedSpd) #1600 - (estimatedSpd*linearChunk)
+            acceleration =  getNaturalAcceleration2(estimatedSpd)#getNaturalAcceleration(estimatedSpd) #1600 - (estimatedSpd*linearChunk)
             if boostAmount > 0:
                 acceleration+=991
                 boostAmount -= boostingCost
@@ -3142,7 +3154,7 @@ def which_wall(destination):
         return 3
 def guided_find_wall_intesection(agent,destination):
     partDist = findDistance(agent.me.location,destination)/3
-    y_intercept = destination[1] - sign(agent.team)*partDist
+    y_intercept = destination[1] + sign(agent.team)*partDist
     if destination[0] > 0:
         x_intercept = destination[0] - partDist
     else:
@@ -3205,16 +3217,7 @@ def lerp(v0, v1, t):  # linear interpolation
   return (1 - t) * v0 + t * v1
 
 
-def getNaturalAcceleration(currentSpd):
-    normalIncrement = 1440/1400
-    topIncrement = 160/10
 
-    if currentSpd <= 1400:
-        return 1440 - (currentSpd*normalIncrement)
-    elif currentSpd <= 1410:
-        return 160 - (currentSpd*topIncrement)
-    else:
-        return 0
 
 #@jit
 def getNaturalAcceleration2(currentSpd):
@@ -3222,9 +3225,9 @@ def getNaturalAcceleration2(currentSpd):
     topIncrement = 160/10
 
     if currentSpd <= 1400:
-        return 1440 - (currentSpd*normalIncrement)
+        return (1440 - (currentSpd*normalIncrement))+160
     elif currentSpd <= 1410:
-        return 160 - (currentSpd*topIncrement)
+        return 160 - ((currentSpd-1400)*topIncrement)
     else:
         return 0
 

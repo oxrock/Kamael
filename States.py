@@ -323,7 +323,7 @@ class RighteousVolley(baseState):
         self.smartAngle = False
         self.target = target
         height = target[2]
-        delay = clamp(1.25,.3,delay)
+        delay = clamp(1.25,.3,delay+0.05)
         if delay >= .3:
             if height <= 200:
                 #print("tiny powershot")
@@ -1438,9 +1438,6 @@ def soloStateManager(agent):
             agent.goalward = goalward
             agent.currentHit = hit
             agent.ballDelay = hit.prediction_time - agent.time
-
-            #agent.selectedBallPred = find_ball_pred_by_time(agent,hit.prediction_time)
-            #agent.ballDelay = agent.selectedBallPred.game_seconds - agent.time #hit.time_difference()
             agent.ballGrounded = False
 
             #print(agent.ballDelay, agent.enemyBallInterceptDelay,agent.contested,agent.timid)
@@ -1478,19 +1475,19 @@ def soloStateManager(agent):
                     if agentType != AngelicEmbrace:
                         agent.activeState = AngelicEmbrace(agent)
                     return
-            # else:
-            #
-            #     if agent.resetTimer >= 5:
-            #         agent.resetTimer = 0
-            #         print("setting up dribble training")
-            #         #game_state = GameState()
-            #         #self.set_game_state(game_state)
-            #         ball_state = BallState(Physics(location=Vector3(agent.me.location[0], agent.me.location[1], agent.me.location[2]+150),velocity=Vector3(agent.me.velocity[0],agent.me.velocity[1],agent.me.velocity[2])))
-            #         game_state = GameState(ball=ball_state)
-            #         agent.set_game_state(game_state)
-            #         if agentType != AngelicEmbrace:
-            #             agent.activeState = AngelicEmbrace(agent)
-            #         return
+            #else:
+                # agent.resetTimer += agent.deltaTime
+                # if agent.resetTimer >= 5:
+                #     agent.resetTimer = 0
+                #     print("setting up dribble training")
+                #     #game_state = GameState()
+                #     #self.set_game_state(game_state)
+                #     ball_state = BallState(Physics(location=Vector3(agent.me.location[0], agent.me.location[1], agent.me.location[2]+160),velocity=Vector3(agent.me.velocity[0],agent.me.velocity[1],agent.me.velocity[2])))
+                #     game_state = GameState(ball=ball_state)
+                #     agent.set_game_state(game_state)
+                #     if agentType != AngelicEmbrace:
+                #         agent.activeState = AngelicEmbrace(agent)
+                #     return
 
 
             # if agent.timid or scared:
@@ -1605,35 +1602,25 @@ def soloStateManager_testing(agent):
                 agent.timid = False
                 scared = False
 
-
-
-
-
             if not agent.contested:
                 if agent.hits[0] != None:
                     temptime = agent.hits[0].prediction_time - agent.gameInfo.seconds_elapsed
-                    if temptime >=1:
+                    # if temptime >=1:
+                    if hit.hit_type != 2:
                         if temptime < agent.enemyBallInterceptDelay - .25:
                             hit = agent.hits[0]
 
             goalward = ballHeadedTowardsMyGoal_testing(agent, hit)
             agent.goalward = goalward
-
-
             agent.currentHit = hit
             agent.ballDelay = hit.prediction_time - agent.time
             agent.ballGrounded = False
 
+
             if hit.hit_type == 2:
                 agent.wallShot = True
-                agent.ballGrounded = False
             else:
                 agent.wallShot = False
-                if hit.hit_type == 1:
-                    if hit.pred_vector[2] <=agent.groundCutOff:
-                        agent.ballGrounded = True
-                    else:
-                        agent.ballGrounded = False
 
 
 
@@ -1672,8 +1659,6 @@ def soloStateManager_testing(agent):
                 else:
                     if agentType != ScaleTheWalls:
                         agent.activeState = ScaleTheWalls(agent)
-                        #print("scaling walls")
-                    #print(f"scale the walls defensive {agent.time}")
                     return
 
 

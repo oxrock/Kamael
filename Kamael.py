@@ -102,6 +102,7 @@ class Kamael(BaseAgent):
         self.currentHit = None
         self.resetLimit = 5
         self.resetCount = 0
+        self.resetTimer = 0
         self.timid = False
         self.dribbling = False
         self.goalward = False
@@ -211,7 +212,7 @@ class Kamael(BaseAgent):
             self.carLength = car.hitbox.length
             self.carWidth = car.hitbox.width
             self.carHeight = car.hitbox.height
-            self.groundCutOff = 93+(self.carHeight*.55)
+            self.groundCutOff = 93+(self.carHeight*.72)
             # if self.team == 0:
             #     self.groundCutOff = 93 + (self.carHeight * .6)
             # else:
@@ -336,6 +337,10 @@ class Kamael(BaseAgent):
             newTeamStateManager(self)
         else:
             soloStateManager(self)
+            # if self.team == 0:
+            #     soloStateManager(self)
+            # else:
+            #     soloStateManager_testing(self)
 
         #action = SimpleControllerState()
         action = self.activeState.update()
