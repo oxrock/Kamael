@@ -1500,20 +1500,20 @@ def handleBounceShot(agent, waitForShot = True):
                 defensivePosition = findOppositeSide(agent, targetVec, rightPost, totalOffset)
             waitingShotPosition = defensivePosition
             targetLoc = waitingShotPosition
+        # if not targetLoc:
+        #     if targDistance > 2500:
+        #         maxRange = 1600
+        #         if agent.contested:
+        #             maxRange = 800
+        #
+        #         _direction = direction(center, targetVec)
+        #         positioningOffset = clamp(maxRange,totalOffset*.6,targDistance*.5)
+        #         targetLoc = targetVec - _direction.scale(positioningOffset)
+        #         modifiedDelay = clamp(6, 0, agent.ballDelay - (positioningOffset / agent.currentSpd))
+        #         #print(f"modified jumpshot {agent.time}")
+
         if not targetLoc:
-            if targDistance > 2500:
-                maxRange = 1600
-                if agent.contested:
-                    maxRange = 800
-
-                _direction = direction(center, targetVec)
-                positioningOffset = clamp(maxRange,totalOffset*.6,targDistance*.5)
-                targetLoc = targetVec - _direction.scale(positioningOffset)
-                modifiedDelay = clamp(6, 0, agent.ballDelay - (positioningOffset / agent.currentSpd))
-                #print(f"modified jumpshot {agent.time}")
-
-            else:
-                targetLoc = waitingShotPosition
+            targetLoc = waitingShotPosition
 
 
 
@@ -1967,13 +1967,14 @@ def lineupShot(agent,multi):
     #         targetLoc = targetVec - _direction.scale(carOffset)
     #         modifiedDelay = agent.ballDelay
 
-    # if not targetLoc:
-    #     if agent.contested:
-    #         if not agent.openGoal:
-    #             _direction = direction(center, targetVec)
-    #             positioningOffset = totalOffset*.6
-    #             targetLoc = targetVec - _direction.scale(positioningOffset)
-    #             modifiedDelay = agent.ballDelay
+    if not targetLoc:
+        if agent.contested:
+            if not agent.openGoal:
+                if agent.me.boostLevel < 1 and agent.currentSpd < 2000:
+                    _direction = direction(center, targetVec)
+                    positioningOffset = totalOffset*.6
+                    targetLoc = targetVec - _direction.scale(positioningOffset)
+                    modifiedDelay = agent.ballDelay
 
     # if not targetLoc:
     #     if distance < 500:
