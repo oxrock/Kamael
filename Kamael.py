@@ -6,7 +6,7 @@ from Utilities import *
 from States import *
 import cProfile, pstats, io
 import time
-from numba import jit
+#from numba import jit
 
 
 
@@ -143,18 +143,19 @@ class Kamael(BaseAgent):
         ])
 
     def determineFacing(self):
-        offset = self.me.location + self.me.velocity
+        offset = self.me.location + self.me.velocity.normalize().scale(500)
         loc = toLocal(offset,self.me)
         angle = correctAngle(math.degrees(math.atan2(loc[1],loc[0])))
 
-        if abs(angle) >= 115:
-            if self.currentSpd <= 300:
+        if abs(angle) >= 100:
+            if self.currentSpd <= 200:
                 self.forward = True
             else:
                 self.forward = False
             #self.forward = False
         else:
             self.forward = True
+        #self.forward = False
 
         self.velAngle = angle
 
@@ -276,6 +277,13 @@ class Kamael(BaseAgent):
                 self.onWall = True
         #if type(self.activeState) != PreemptiveStrike:
         self.hits = findHits(self, self.groundCutOff, self.jumpLimit)
+
+        # print("==========")
+        # for each in self.hits:
+        #     if each != None:
+        #         print(each)
+
+
         self.determineFacing()
         self.goalPred = None
         self.gravity = game.game_info.world_gravity_z
@@ -336,11 +344,11 @@ class Kamael(BaseAgent):
         if len(self.allies) > 0:
             newTeamStateManager(self)
         else:
-            soloStateManager(self)
+            #soloStateManager(self)
             # if self.team == 0:
             #     soloStateManager(self)
             # else:
-            #     soloStateManager_testing(self)
+            soloStateManager_testing(self)
 
         #action = SimpleControllerState()
         action = self.activeState.update()
