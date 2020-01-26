@@ -596,6 +596,8 @@ class PreemptiveStrike(baseState):
         self.kickoff_type = getKickoffPosition(agent.me.location)
         self.method = 0
         self.setup()
+        agent.stubbornessTimer = 5
+        agent.stubborness= agent.stubbornessMax
 
     def setup(self):
         if abs(self.agent.me.location[0]) < 257:
@@ -705,9 +707,9 @@ class PreemptiveStrike(baseState):
                         if self.kickoff_type == 0:
                             if destination[0] > self.agent.me.location[0]:
                                 #print("greater than 0")
-                                destination.data[0] += 1000
+                                destination.data[0] += 1100#1000
                             else:
-                                destination.data[0] -= 1000
+                                destination.data[0] -= 1100#1000
                                 #print("less than 0")
                         elif self.kickoff_type == 1:
                             if destination[0] > self.agent.me.location[0]:
@@ -729,9 +731,9 @@ class PreemptiveStrike(baseState):
                         if self.kickoff_type == 0:
                             if destination[0] > self.agent.me.location[0]:
                                 #print("greater than 0")
-                                destination.data[0] += 1000
+                                destination.data[0] += 1100#1000
                             else:
-                                destination.data[0] -= 1000
+                                destination.data[0] -= 1100#1000
                                 #print("less than 0")
                         elif self.kickoff_type == 1:
                             if destination[0] > self.agent.me.location[0]:
@@ -883,8 +885,11 @@ class Chase(baseState):
 
 class BlessingOfSafety(baseState):
     def update(self):
+        distMin = 2000
+        # if len(self.agent.allies) > 0:
+        #     distMin = 1200
         if distance2D(Vector([0, 5200 * sign(self.agent.team), 200]),
-                      self.agent.currentHit.pred_vector) < 2000:
+                      self.agent.currentHit.pred_vector) < distMin:
             return ShellTime(self.agent)
         else:
             return playBack(self.agent)
@@ -1197,9 +1202,8 @@ def newTeamStateManager(agent):
             if agentType == RighteousVolley:
                 if agent.activeState.active != False:
                     return
-
-            hit = find_soonest_hit(agent)
-            #hit = fastesthit
+            fastesthit = find_soonest_hit(agent)
+            hit = fastesthit
             openNet = openGoalOpportunity(agent)
             agent.openGoal = openNet
             agent.timid = False
@@ -1227,15 +1231,15 @@ def newTeamStateManager(agent):
 
 
 
+            if not agent.contested:
+                if agent.hits[0] != None:
+                    if hit.hit_type != 2:
+                        temptime = agent.hits[0].prediction_time - agent.time
+                        # if temptime >=1:
 
-
-            # if not agent.contested:
-            #     if agent.hits[0] != None:
-            #         temptime = agent.hits[0].prediction_time - agent.gameInfo.seconds_elapsed
-            #         #if temptime >=1:
-            #         if hit.hit_type != 2:
-            #             if temptime < agent.enemyBallInterceptDelay - .25:
-            #                 hit = agent.hits[0]
+                        if temptime < agent.enemyBallInterceptDelay - .25:
+                            if not ballHeadedTowardsMyGoal_testing(agent, agent.hits[0]):
+                                hit = agent.hits[0]
 
             goalward = ballHeadedTowardsMyGoal_testing(agent, hit)
             agent.goalward = goalward
@@ -1288,15 +1292,16 @@ def newTeamStateManager(agent):
 
                 myDist = distance2D(agent.me.location, agent.ball.location)
                 for ally in agent.allies:
-                    if ally.location[1] * sign(agent.team) > agent.ball.location[1] *sign(agent.team):
-                        if distance2D(ally.location, agent.ball.location) < myDist:
-                            man += 1
+                    if not ally.demolished:
+                        if ally.location[1] * sign(agent.team) > agent.ball.location[1] *sign(agent.team):
+                            if distance2D(ally.location, agent.ball.location) < myDist:
+                                man += 1
                 man = clamp(3, 0, man)
 
             if man == 1:
-                # hit = fastesthit
-                # agent.currentHit = hit
-                # agent.ballDelay = hit.prediction_time - agent.time
+                hit = fastesthit
+                agent.currentHit = hit
+                agent.ballDelay = hit.prediction_time - agent.time
 
                 #print(f"{hit.hit_type} in {agent.ballDelay} seconds")
 
@@ -1596,7 +1601,7 @@ def soloStateManager_testing(agent):
             tempDelay = hit.prediction_time - agent.gameInfo.seconds_elapsed
             #print(tempDelay)
 
-            if tempDelay >= agent.enemyBallInterceptDelay - .25:
+            if tempDelay >= agent.enemyBallInterceptDelay - agent.contestedTimeLimit:
                 if agent.enemyAttacking:
                     agent.contested = True
 
@@ -1613,14 +1618,15 @@ def soloStateManager_testing(agent):
                 agent.timid = False
                 scared = False
 
-            if not agent.contested:
-                if agent.hits[0] != None:
-                    temptime = agent.hits[0].prediction_time - agent.gameInfo.seconds_elapsed
-                    # if temptime >=1:
-                    if hit.hit_type != 2:
-                        if temptime < agent.enemyBallInterceptDelay - .25:
-                            if not ballHeadedTowardsMyGoal_testing(agent, agent.hits[0]):
-                                hit = agent.hits[0]
+            # if not agent.contested:
+            #     if agent.hits[0] != None:
+            #         if hit.hit_type != 2:
+            #             temptime = agent.hits[0].prediction_time - agent.time
+            #             # if temptime >=1:
+            #
+            #             if temptime < agent.enemyBallInterceptDelay - agent.contestedTimeLimit:
+            #                 if not ballHeadedTowardsMyGoal_testing(agent, agent.hits[0]):
+            #                     hit = agent.hits[0]
 
             goalward = ballHeadedTowardsMyGoal_testing(agent, hit)
             agent.goalward = goalward
