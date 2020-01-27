@@ -886,12 +886,24 @@ class Chase(baseState):
 class BlessingOfSafety(baseState):
     def update(self):
         distMin = 2000
-        # if len(self.agent.allies) > 0:
+        # if len(self.agent.allies) ==1:
+        #     distMin = 1500
+        # elif len(self.agent.allies) > 1:
         #     distMin = 1200
+
         if distance2D(Vector([0, 5200 * sign(self.agent.team), 200]),
                       self.agent.currentHit.pred_vector) < distMin:
             return ShellTime(self.agent)
         else:
+            if self.agent.rotationNumber == 2:
+                if len(self.agent.allies) >=2:
+                    return playBack(self.agent,buffer = 2500)
+                else:
+                    return playBack(self.agent)
+            if self.agent.rotationNumber >=3:
+                return playBack(self.agent,buffer = 6500)
+
+            #print("returning default value")
             return playBack(self.agent)
 
 
@@ -1298,6 +1310,8 @@ def newTeamStateManager(agent):
                                 man += 1
                 man = clamp(3, 0, man)
 
+            agent.rotationNumber = man
+
             if man == 1:
                 hit = fastesthit
                 agent.currentHit = hit
@@ -1305,7 +1319,14 @@ def newTeamStateManager(agent):
 
                 #print(f"{hit.hit_type} in {agent.ballDelay} seconds")
 
-
+                
+                if agent.me.boostLevel <=0:
+                    if len(agent.allies) >1:
+                        if distance2D(agent.me.location,hit.pred_vector) > 7000:
+                            if not is_in_strike_zone(agent,hit.pred_vector):
+                                if agentType != BlessingOfSafety:
+                                    agent.activeState = BlessingOfSafety(agent)
+                                return
 
                 if carDistanceFromGoal > ballDistanceFromGoal:
                     if agentType != HolyProtector:
@@ -1352,25 +1373,6 @@ def newTeamStateManager(agent):
                 return
 
             elif man == 4:
-                #check if there's an ally defending
-                # viable = False
-                # for ally in agent.allies:
-                #     if distance2D(ally.location,agent.ball.location) < ballDistanceFromGoal:
-                #         viable = True
-                #         break
-                # if viable:
-                #     if agent.me.boostLevel > 0 or agent.currentSpd >= 2200:
-                #         if agentType != DivineRetribution:
-                #             agent.activeState = DivineRetribution(agent, agent.closestEnemyToBall)
-                #         return
-                #     else:
-                #         if agentType != BlessingOfSafety:
-                #             agent.activeState = BlessingOfSafety(agent)
-                #         return
-                # else:
-                #     if agentType != BlessingOfSafety:
-                #         agent.activeState = BlessingOfSafety(agent)
-                #     return
                 if agentType != BlessingOfSafety:
                     agent.activeState = BlessingOfSafety(agent)
                 return

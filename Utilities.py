@@ -793,9 +793,9 @@ def saferBoostGrabber(agent):
 
     return efficientMover(agent, closestBoost.location, agent.maxSpd,boostHunt=False)
 
-def backmanBoostGrabber(agent, stayOnSide = True):
+def backmanBoostGrabber(agent, stayOnSide = True, buffer = 3000):
     #minDistance = distance2D(Vector([0, 5100 * sign(agent.team), 200]), agent.ball.location)
-    minY = (agent.ball.location[1] +3000*sign(agent.team))*sign(agent.team)
+    minY = (agent.ball.location[1] +buffer*sign(agent.team))*sign(agent.team)
     closestBoost = physicsObject()
     closestBoost.location = Vector([0, 4900 * sign(agent.team), 200])
     bestDistance = math.inf
@@ -1104,7 +1104,7 @@ def ShellTime(agent):
 
     if carDistance < goalDistance:
         if agent.goalward:
-            if targetVec[2] > 105:
+            if targetVec[2] > 93+(agent.carHeight*.5):
                 return handleBounceShot(agent, waitForShot=False)
 
 
@@ -1676,11 +1676,11 @@ def playDefensive(agent):
     # leftPost = Vector([-900, 5200 * sign(agent.team), 200])
     return gate(agent)
 
-    #return driveController(agent,centerGoal,0.0001,expedite=True)
 
-def playBack(agent):
+
+def playBack(agent, buffer = 4500):
     ball_x = clamp(3200,-3200,agent.ball.location[0])
-    centerField = Vector([ball_x, agent.ball.location[1] + 4500 * sign(agent.team), 0])
+    centerField = Vector([ball_x, agent.ball.location[1] + buffer * sign(agent.team), 0])
 
 
     boostTarget,dist = boostSwipe(agent)
@@ -1688,14 +1688,18 @@ def playBack(agent):
         return driveController(agent,boostTarget,agent.time,expedite=True)
 
     if agent.me.boostLevel < 80:
-        return backmanBoostGrabber(agent)
+        if len(agent.allies) <=1:
+            return backmanBoostGrabber(agent)
+        else:
+            if agent.rotationNumber == 1:
+                return backmanBoostGrabber(agent,buffer = 1000)
+            elif agent.rotationNumber == 2:
+                return backmanBoostGrabber(agent, buffer=2000)
+            else:
+                return backmanBoostGrabber(agent)
 
     else:
-        # agent.renderCalls.append(renderCall(agent.renderer.draw_line_3d, agent.me.location.toList(), centerField.toList(),
-        #                                     agent.renderer.blue))
-        #return efficientMover(agent, centerField, maxPossibleSpeed, boostHunt=True)
-        #return driveController(agent,centerField,agent.time,expedite=False)
-        if abs(centerField[1]) > 4500:
+        if abs(centerField[1]) > buffer:
             return gate(agent)
         else:
             return driveController(agent, centerField, agent.time, expedite=False)

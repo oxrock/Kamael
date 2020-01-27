@@ -112,6 +112,7 @@ class Kamael(BaseAgent):
         self.activeState = PreemptiveStrike(self)
         self.contestedTimeLimit = .5
         self.demoSpawns = [[Vector([-2304, -4608,0]),Vector([2304, -4608,0])],[Vector([2304, 4608,0]),Vector([-2304, 4608,0])]]
+        self.rotationNumber = 1
 
 
     def demoRelocation(self,car):
