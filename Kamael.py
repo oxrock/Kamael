@@ -6,7 +6,7 @@ from Utilities import *
 from States import *
 import cProfile, pstats, io
 import time
-#from numba import jit
+import numpy as np
 
 
 
@@ -45,6 +45,7 @@ class Kamael(BaseAgent):
         self.gameInfo = None
         self.onSurface = False
         self.boosts = []
+        self.bigBoosts = []
         self.fieldInfo = []
         self.positions = []
         self.time = 0
@@ -87,7 +88,7 @@ class Kamael(BaseAgent):
         self.openGoal = False
         self.boostConsumptionRate = 33.3
         self.boostAccelerationRate = 991.666
-        self.jumpLimit = 275
+        self.jumpLimit = 280
         self.wallShotsEnabled = True
         self.touch = None
         self.targetDistance = 1500
@@ -107,12 +108,13 @@ class Kamael(BaseAgent):
         self.goalward = False
         self.stubbornessTimer = 0
         self.stubbornessMax = 500
-        self.stubbornessMin = 200
+        self.stubbornessMin = 0
         self.stubborness = self.stubbornessMin
         self.activeState = PreemptiveStrike(self)
         self.contestedTimeLimit = .5
         self.demoSpawns = [[Vector([-2304, -4608,0]),Vector([2304, -4608,0])],[Vector([2304, 4608,0]),Vector([-2304, 4608,0])]]
         self.rotationNumber = 1
+        self.dtype = [('physics', [('location', '<f4', 3), ('rotation', [('pitch', '<f4'), ('yaw', '<f4'), ('roll', '<f4')]), ('velocity', '<f4', 3), ('angular_velocity', '<f4', 3)]), ('game_seconds', '<f4')]
 
 
     def demoRelocation(self,car):
@@ -167,7 +169,7 @@ class Kamael(BaseAgent):
         loc = toLocal(offset,self.me)
         angle = correctAngle(math.degrees(math.atan2(loc[1],loc[0])))
 
-        if abs(angle) >= 100:
+        if abs(angle) > 90:
             if self.currentSpd <= self.stubborness:
                 self.forward = True
             else:
@@ -239,17 +241,12 @@ class Kamael(BaseAgent):
 
         #print(self.me.rotation[0])
         if not self.hitbox_set:
-            #'hitbox': {'length': 118, 'width': 84, 'height': 36},
             self.carLength = car.hitbox.length
             self.carWidth = car.hitbox.width
             self.carHeight = car.hitbox.height
             self.groundCutOff = 93+(self.carHeight*.72)
-            # if self.team == 0:
-            #     self.groundCutOff = 93 + (self.carHeight * .6)
-            # else:
-            #     self.groundCutOff = 93 + (self.carHeight * .7)
             self.hitbox_set = True
-            print(f"team {self.team} hitbox length:{self.carLength} width:{self.carWidth} height:{self.carHeight} groundCutoff:{self.groundCutOff}")
+            print(f"Kamael on team {self.team} hitbox (length:{self.carLength} width:{self.carWidth} height:{self.carHeight}) ")
 
         if self.stubbornessTimer > 0:
             self.stubbornessTimer -= self.deltaTime
@@ -304,23 +301,30 @@ class Kamael(BaseAgent):
                     self.enemies.append(_obj)
         self.gameInfo = game.game_info
         self.boosts.clear()
+        self.bigBoosts.clear()
         self.fieldInfo = self.get_field_info()
         for index in range(self.fieldInfo.num_boosts):
             packetBoost = game.game_boosts[index]
             fieldInfoBoost = self.fieldInfo.boost_pads[index]
             boostStatus = False
             if packetBoost.timer <=0:
-                boostStatus = True
+                if packetBoost.is_active:
+                    boostStatus = True
             boostLocation = [fieldInfoBoost.location.x,fieldInfoBoost.location.y,fieldInfoBoost.location.z]
-            self.boosts.append(Boost_obj([fieldInfoBoost.location.x,fieldInfoBoost.location.y,fieldInfoBoost.location.z],fieldInfoBoost.is_full_boost, boostStatus))
+            boost_obj = Boost_obj([fieldInfoBoost.location.x,fieldInfoBoost.location.y,fieldInfoBoost.location.z],fieldInfoBoost.is_full_boost, boostStatus)
+            self.boosts.append(boost_obj)
+            if boost_obj.bigBoost:
+                self.bigBoosts.append(boost_obj)
 
         self.onWall = False
         self.wallShot = False
         if self.onSurface:
-            if self.me.location[2] >= 120:
+            if self.me.location[2] >= 60:
                 self.onWall = True
         #if type(self.activeState) != PreemptiveStrike:
-        self.hits = findHits(self, self.groundCutOff, self.jumpLimit)
+        self.hits =  findHits(self, self.groundCutOff, self.jumpLimit)
+        convertToArray(self)
+        self.hits = findHits_numpy(self, self.groundCutOff, self.jumpLimit)
 
         # print("==========")
         # for each in self.hits:
@@ -381,7 +385,7 @@ class Kamael(BaseAgent):
 
         return True
 
-    #@profile
+    @profile
     def get_output(self, packet: GameTickPacket) -> SimpleControllerState:
         oldTimer = self.time
         self.preprocess(packet)

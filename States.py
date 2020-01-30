@@ -323,10 +323,9 @@ class RighteousVolley(baseState):
         self.smartAngle = False
         self.target = target
         height = target[2]
-        # if agent.team == 0:
-        #     delay = clamp(1.25,.3,delay+0.05)
-        # else:
-        delay = clamp(1.25, .3, delay+0.05)
+        #boomerDelay = 0
+        boomerDelay = 0.05
+        delay = clamp(1.25,.3,delay+boomerDelay)
         if delay >= .3:
             if height <= 200:
                 #print("tiny powershot")
@@ -540,7 +539,7 @@ class Kickoff(baseState):
             if self.flipState.active:
                 controller = self.flipState.update()
                 if self.agent.time - self.flipState.flip_obj.flipStartedTimer <= 0.15:
-                    if spd < 2200:
+                    if spd < maxPossibleSpeed:
                         controller.boost = True
                 return controller
             if self.secondFlip:
@@ -582,6 +581,20 @@ class Kickoff(baseState):
             self.secondFlip = True
             return self.flipState.update()
 
+class HeavenylyReprieve(baseState):
+    def __init__(self,agent,boostloc):
+        self.agent = agent
+        self.boostLoc = boostloc
+        self.active = True
+
+    def update(self):
+        result = inCornerWithBoost(self.agent)
+        if result != False:
+            return refuel(self.agent, result[0])
+        else:
+            self.active = False
+            return ShellTime(self.agent)
+
 class PreemptiveStrike(baseState):
     def __init__(self,agent):
         self.agent = agent
@@ -596,8 +609,8 @@ class PreemptiveStrike(baseState):
         self.kickoff_type = getKickoffPosition(agent.me.location)
         self.method = 0
         self.setup()
-        agent.stubbornessTimer = 5
-        agent.stubborness= agent.stubbornessMax
+        #agent.stubbornessTimer = 5
+        #agent.stubborness= agent.stubbornessMax
 
     def setup(self):
         if abs(self.agent.me.location[0]) < 257:
@@ -777,7 +790,7 @@ class PreemptiveStrike(baseState):
                     return self.flipState.update()
                 else:
                     controls = self.rightSelf()
-                    if spd < 2200:
+                    if spd < maxPossibleSpeed:
                         controls.boost = True
                     if ballDistance < 150:
                         self.retire()
@@ -886,10 +899,6 @@ class Chase(baseState):
 class BlessingOfSafety(baseState):
     def update(self):
         distMin = 2000
-        # if len(self.agent.allies) ==1:
-        #     distMin = 1500
-        # elif len(self.agent.allies) > 1:
-        #     distMin = 1200
 
         if distance2D(Vector([0, 5200 * sign(self.agent.team), 200]),
                       self.agent.currentHit.pred_vector) < distMin:
@@ -897,11 +906,11 @@ class BlessingOfSafety(baseState):
         else:
             if self.agent.rotationNumber == 2:
                 if len(self.agent.allies) >=2:
-                    return playBack(self.agent,buffer = 2500)
+                    return playBack(self.agent,buffer = 2000)
                 else:
                     return playBack(self.agent)
             if self.agent.rotationNumber >=3:
-                return playBack(self.agent,buffer = 6500)
+                return playBack(self.agent,buffer = 5500)
 
             #print("returning default value")
             return playBack(self.agent)
@@ -1222,12 +1231,12 @@ def newTeamStateManager(agent):
             scared = False
             tempDelay = hit.prediction_time - agent.gameInfo.seconds_elapsed
 
-            if tempDelay >= agent.enemyBallInterceptDelay - .25:
+            if tempDelay >= agent.enemyBallInterceptDelay - agent.contestedTimeLimit:
                 if agent.enemyAttacking:
                     agent.contested = True
 
 
-            if tempDelay >= agent.enemyBallInterceptDelay + 1:
+            if tempDelay >= agent.enemyBallInterceptDelay + agent.contestedTimeLimit:
                 if not butterZone(hit.pred_vector):
                     if ballDistanceFromGoal <= 5000:
                         agent.timid = True
@@ -1236,8 +1245,9 @@ def newTeamStateManager(agent):
                     #print(tempDelay,agent.enemyBallInterceptDelay)
                     #pass
 
-            if distance2D(hit.pred_vector,myGoalLoc) <= 2000 or distance2D(agent.enemyTargetVec,myGoalLoc) <= 2000:
+            if distance2D(hit.pred_vector,myGoalLoc) <= 2000 or distance2D(agent.enemyTargetVec,myGoalLoc) <= 2000 or ballDistanceFromGoal <= 2000:
                 agent.contested = True
+                agent.enemyAttacking = True
                 agent.timid = False
                 scared = False
 
@@ -1249,7 +1259,7 @@ def newTeamStateManager(agent):
                         temptime = agent.hits[0].prediction_time - agent.time
                         # if temptime >=1:
 
-                        if temptime < agent.enemyBallInterceptDelay - .25:
+                        if temptime < agent.enemyBallInterceptDelay - agent.contestedTimeLimit:
                             if not ballHeadedTowardsMyGoal_testing(agent, agent.hits[0]):
                                 hit = agent.hits[0]
 
@@ -1305,21 +1315,31 @@ def newTeamStateManager(agent):
                 myDist = distance2D(agent.me.location, agent.ball.location)
                 for ally in agent.allies:
                     if not ally.demolished:
-                        if ally.location[1] * sign(agent.team) > agent.ball.location[1] *sign(agent.team):
+                        if ally.location[1] * sign(agent.team) > agent.ball.location[1] * sign(agent.team):
                             if distance2D(ally.location, agent.ball.location) < myDist:
                                 man += 1
                 man = clamp(3, 0, man)
 
             agent.rotationNumber = man
 
+            boostOpportunity = inCornerWithBoost(agent)
+            if boostOpportunity != False:
+                if agent.me.boostLevel <=50:
+                    getBoost = False
+                    if agent.team == 0:
+                        if boostOpportunity[1] == 0 or boostOpportunity[1] == 1:
+                            getBoost = True
+                    else:
+                        if boostOpportunity[1] == 2 or boostOpportunity[1] == 3:
+                            getBoost = True
+                    if getBoost:
+                        if agentType != HeavenylyReprieve:
+                            agent.activeState = HeavenylyReprieve(agent,boostOpportunity[0])
+                        return
+
             if man == 1:
-                hit = fastesthit
-                agent.currentHit = hit
-                agent.ballDelay = hit.prediction_time - agent.time
 
-                #print(f"{hit.hit_type} in {agent.ballDelay} seconds")
 
-                
                 if agent.me.boostLevel <=0:
                     if len(agent.allies) >1:
                         if distance2D(agent.me.location,hit.pred_vector) > 7000:
@@ -1615,20 +1635,23 @@ def soloStateManager_testing(agent):
             #         else:
             #             scared = True
 
-            if distance2D(hit.pred_vector,myGoalLoc) <= 2000 or distance2D(agent.enemyTargetVec,myGoalLoc) <= 2000:
+            if distance2D(hit.pred_vector, myGoalLoc) <= 2000 or distance2D(agent.enemyTargetVec,
+                                                                            myGoalLoc) <= 2000 or ballDistanceFromGoal <= 2000:
                 agent.contested = True
+                agent.enemyAttacking = True
                 agent.timid = False
                 scared = False
 
-            # if not agent.contested:
-            #     if agent.hits[0] != None:
-            #         if hit.hit_type != 2:
-            #             temptime = agent.hits[0].prediction_time - agent.time
-            #             # if temptime >=1:
-            #
-            #             if temptime < agent.enemyBallInterceptDelay - agent.contestedTimeLimit:
-            #                 if not ballHeadedTowardsMyGoal_testing(agent, agent.hits[0]):
-            #                     hit = agent.hits[0]
+            #if agent.team == 0:
+            if not agent.contested:
+                if agent.hits[0] != None:
+                    if hit.hit_type != 2:
+                        temptime = agent.hits[0].prediction_time - agent.time
+                        # if temptime >=1:
+
+                        if temptime < agent.enemyBallInterceptDelay - agent.contestedTimeLimit:
+                            if not ballHeadedTowardsMyGoal_testing(agent, agent.hits[0]):
+                                hit = agent.hits[0]
 
             goalward = ballHeadedTowardsMyGoal_testing(agent, hit)
             agent.goalward = goalward
@@ -1665,10 +1688,25 @@ def soloStateManager_testing(agent):
                     agent.activeState = AngelicEmbrace(agent)
                 return
 
-            if scared or agent.timid:
-                if agentType != BlessingOfSafety:
-                    agent.activeState = BlessingOfSafety(agent)
-                return
+            boostOpportunity = inCornerWithBoost(agent)
+            if boostOpportunity != False:
+                if agent.me.boostLevel <= 50:
+                    getBoost = False
+                    if agent.team == 0:
+                        if boostOpportunity[1] == 0 or boostOpportunity[1] == 1:
+                            getBoost = True
+                    else:
+                        if boostOpportunity[1] == 2 or boostOpportunity[1] == 3:
+                            getBoost = True
+                    if getBoost:
+                        if agentType != HeavenylyReprieve:
+                            agent.activeState = HeavenylyReprieve(agent, boostOpportunity[0])
+                        return
+
+            # if scared or agent.timid:
+            #     if agentType != BlessingOfSafety:
+            #         agent.activeState = BlessingOfSafety(agent)
+            #     return
 
             if carDistanceFromGoal > ballDistanceFromGoal:
                 if agentType != HolyProtector:
