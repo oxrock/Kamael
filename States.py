@@ -244,7 +244,7 @@ class LeapOfFaith(baseState):
                 controller_state.throttle = -0
 
             elif self.targetCode == 6:
-                target_local = toLocal(self.target, self.agent.me)
+                target_local = toLocal(self.target, self.agent.me).normalize()
                 target_angle = math.atan2(target_local.data[1], target_local.data[0])
                 controller_state.jump = True
                 controller_state.yaw = math.sin(target_angle)
@@ -323,8 +323,9 @@ class RighteousVolley(baseState):
         self.smartAngle = False
         self.target = target
         height = target[2]
-        #boomerDelay = 0
         boomerDelay = 0.05
+        # if len(agent.allies) < 1:
+        #     boomerDelay = 0
         delay = clamp(1.25,.3,delay+boomerDelay)
         if delay >= .3:
             if height <= 200:
@@ -609,8 +610,9 @@ class PreemptiveStrike(baseState):
         self.kickoff_type = getKickoffPosition(agent.me.location)
         self.method = 0
         self.setup()
-        #agent.stubbornessTimer = 5
-        #agent.stubborness= agent.stubbornessMax
+        agent.stubbornessTimer = 5
+        agent.stubborness= agent.stubbornessMax
+        agent.stubborness= agent.stubbornessMax
 
     def setup(self):
         if abs(self.agent.me.location[0]) < 257:
@@ -1455,6 +1457,7 @@ def soloStateManager(agent):
                     #print(tempDelay,agent.enemyBallInterceptDelay)
                     #pass
 
+
             if distance2D(hit.pred_vector,myGoalLoc) <= 2000 or distance2D(agent.enemyTargetVec,myGoalLoc) <= 2000:
                 agent.contested = True
                 agent.timid = False
@@ -1628,17 +1631,10 @@ def soloStateManager_testing(agent):
                     agent.contested = True
 
 
-            # if tempDelay >= agent.enemyBallInterceptDelay + .5:
-            #     if not butterZone(hit.pred_vector):
-            #         if ballDistanceFromGoal <= 5000:
-            #             agent.timid = True
-            #         else:
-            #             scared = True
-
             if distance2D(hit.pred_vector, myGoalLoc) <= 2000 or distance2D(agent.enemyTargetVec,
                                                                             myGoalLoc) <= 2000 or ballDistanceFromGoal <= 2000:
                 agent.contested = True
-                agent.enemyAttacking = True
+                #agent.enemyAttacking = True
                 agent.timid = False
                 scared = False
 

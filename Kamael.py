@@ -60,6 +60,7 @@ class Kamael(BaseAgent):
         self.forward = True
         self.velAngle = 0
         self.onWall = False
+        self.wallLimit = 90
         self.stateTimer = 0
         self.contested = True
         self.flipTimer = 0
@@ -107,15 +108,22 @@ class Kamael(BaseAgent):
         self.dribbling = False
         self.goalward = False
         self.stubbornessTimer = 0
-        self.stubbornessMax = 500
-        self.stubbornessMin = 0
+        self.stubbornessMax = 600
+        self.stubbornessMin = 300
         self.stubborness = self.stubbornessMin
         self.activeState = PreemptiveStrike(self)
         self.contestedTimeLimit = .5
         self.demoSpawns = [[Vector([-2304, -4608,0]),Vector([2304, -4608,0])],[Vector([2304, 4608,0]),Vector([-2304, 4608,0])]]
         self.rotationNumber = 1
         self.dtype = [('physics', [('location', '<f4', 3), ('rotation', [('pitch', '<f4'), ('yaw', '<f4'), ('roll', '<f4')]), ('velocity', '<f4', 3), ('angular_velocity', '<f4', 3)]), ('game_seconds', '<f4')]
+        self.Dtype = np.dtype([('physics', [('location', '<f4', 3),
+                               ('rotation', [('pitch', '<f4'), ('yaw', '<f4'), ('roll', '<f4')]),
+                               ('velocity', '<f4', 3),
+                               ('angular_velocity', '<f4', 3)]),
+                  ('game_seconds', '<f4')])
 
+        self.reachLength = 93+50
+        self.debugging = False
 
     def demoRelocation(self,car):
         if car.team == 0:
@@ -241,11 +249,13 @@ class Kamael(BaseAgent):
 
         #print(self.me.rotation[0])
         if not self.hitbox_set:
+            self.fieldInfo = self.get_field_info()
             self.carLength = car.hitbox.length
             self.carWidth = car.hitbox.width
             self.carHeight = car.hitbox.height
             self.groundCutOff = 93+(self.carHeight*.72)
             self.hitbox_set = True
+            self.reachLength = 75+(car.hitbox.length*.665)
             print(f"Kamael on team {self.team} hitbox (length:{self.carLength} width:{self.carWidth} height:{self.carHeight}) ")
 
         if self.stubbornessTimer > 0:
@@ -292,7 +302,7 @@ class Kamael(BaseAgent):
                     _obj.velocity = Vector([0, 0, 0])
                     _obj.rotation = Vector([0, 0, 0])
                     _obj.avelocity = Vector([0, 0, 0])
-                    _obj.boostLevel = 34
+                    _obj.boostLevel = 33
                     _obj.onSurface = True
 
                 if car.team == self.team:
@@ -300,9 +310,9 @@ class Kamael(BaseAgent):
                 else:
                     self.enemies.append(_obj)
         self.gameInfo = game.game_info
-        self.boosts.clear()
-        self.bigBoosts.clear()
-        self.fieldInfo = self.get_field_info()
+        self.boosts = []
+        self.bigBoosts = []
+
         for index in range(self.fieldInfo.num_boosts):
             packetBoost = game.game_boosts[index]
             fieldInfoBoost = self.fieldInfo.boost_pads[index]
@@ -319,12 +329,16 @@ class Kamael(BaseAgent):
         self.onWall = False
         self.wallShot = False
         if self.onSurface:
-            if self.me.location[2] >= 60:
+            if self.me.location[2] >= self.wallLimit:
                 self.onWall = True
         #if type(self.activeState) != PreemptiveStrike:
         self.hits =  findHits(self, self.groundCutOff, self.jumpLimit)
-        convertToArray(self)
-        self.hits = findHits_numpy(self, self.groundCutOff, self.jumpLimit)
+        # for i in range(1000):
+        #     convertToArray(self)
+        # for i in range(1000):
+        #     newConvertToArray(self)
+        #self.ballPred = newConvertToArray(self)
+        #self.hits = findHits_testing(self, self.groundCutOff, self.jumpLimit)
 
         # print("==========")
         # for each in self.hits:
@@ -362,14 +376,16 @@ class Kamael(BaseAgent):
             elif self.enemyAttackingBall():
                 self.enemyAttacking = True
 
-            self.closestEnemyDistances.append(self.closestEnemyToBallDistance)
+            closestEnemyToBallTargetDistance = distance2D(self.enemyTargetVec,self.closestEnemyToBall.location)
+            #self.closestEnemyDistances.append(self.closestEnemyToBallDistance)
+            self.closestEnemyDistances.append(closestEnemyToBallTargetDistance)
             del self.closestEnemyDistances[0]
         else:
             self.closestEnemyToBall = self.me
             self.closestEnemyToMe = self.me
             self.closestEnemyToBallDistance = 0
             self.closestEnemyToMeDistance = 0
-            #self.contested = False
+            self.contested = False
             self.enemyAttacking = False
         # if self.enemyBallInterceptDelay != 0:
         #     print(f"{self.enemyBallInterceptDelay}")
@@ -385,7 +401,7 @@ class Kamael(BaseAgent):
 
         return True
 
-    @profile
+    #@profile
     def get_output(self, packet: GameTickPacket) -> SimpleControllerState:
         oldTimer = self.time
         self.preprocess(packet)
@@ -401,15 +417,15 @@ class Kamael(BaseAgent):
         #action = SimpleControllerState()
         action = self.activeState.update()
         self.controller_state = action
+        if self.debugging:
+            self.renderer.begin_rendering()
+            self.renderer.draw_string_3d(self.me.location.data, 2, 2, str(type(self.activeState).__name__),
+                                         self.renderer.white())
 
-        self.renderer.begin_rendering()
-        self.renderer.draw_string_3d(self.me.location.data, 2, 2, str(type(self.activeState).__name__),
-                                     self.renderer.white())
-
-        for each in self.renderCalls:
-            each.run()
-        self.renderer.end_rendering()
-        self.renderCalls.clear()
+            for each in self.renderCalls:
+                each.run()
+            self.renderer.end_rendering()
+            self.renderCalls.clear()
 
         # if self.currentSpd < 300:
         #     print(self.activeState)
